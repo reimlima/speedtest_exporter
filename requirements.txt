@@ -1,0 +1,3 @@
+systemd
+speedtest-cli
+prometheus-client

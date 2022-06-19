@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Speedtest Exporter - Exposes Metrics to Prometheus
+
+"""
+import os
+import sys
+import time
+import logging
+import argparse
+import speedtest
+from prometheus_client import start_http_server
+from prometheus_client.core import GaugeMetricFamily, REGISTRY
+from systemd.journal import JournaldLogHandler
+
+SCRIPT_NAME = os.path.basename(sys.argv[0])
+SCRIPT_INSTANCE = os.uname()[1]
+speed_test_metrics = {}
+
+# Dealing with command line options
+PARSER = argparse.ArgumentParser()
+
+PARSER.add_argument(
+    '-p',
+    '--port',
+    help='Port, default: 8042',
+    nargs='?',
+    const=8042,
+    type=int,
+    default=8042)
+
+ARGS = PARSER.parse_args()
+
+if len(sys.argv) == 1:
+    PARSER.print_help()
+    sys.exit(1)
+
+PORT_NUMBER = ARGS.port
+
+# Loggin to Journalctl
+LOGGER = logging.getLogger(SCRIPT_NAME)
+JOURNALHANDLER = JournaldLogHandler()
+JOURNALHANDLER.setFormatter(logging.Formatter('[%(levelname)s] %(message)s'))
+LOGGER.addHandler(JOURNALHANDLER)
+LOGGER.setLevel(logging.INFO)
+
+class SpeedTestCollector(object):
+    """
+    Class to be called from mais function and working as a server, like prometheus_client examples
+    """
+    def collect(self):
+        """
+        Function that does almost everything, like prometheus_client examples
+        """
+        speed_test_executor = speedtest.Speedtest()
+        speed_test_executor.get_servers()
+        speed_test_executor.get_best_server()
+        speed_test_executor.download()
+        speed_test_executor.upload()
+        speed_test_result = speed_test_executor.results.dict()
+        speed_test_metrics['download'] = speed_test_result['download']
+        speed_test_metrics['upload'] = speed_test_result['upload']
+        speed_test_metrics['ping'] = speed_test_result['ping']
+        for dict_key in speed_test_metrics:
+            metric_name = 'speedtest_{}'.format(dict_key)
+            help_text = 'speed test metric for {}'.format(dict_key)
+            speed_test_metric_value = speed_test_metrics[dict_key]
+            speed_test_metric_constructor = GaugeMetricFamily(
+                metric_name, help_text, labels=['type', 'instance', 'job'])
+            speed_test_metric_constructor.add_metric(
+                ['speed_test_metrics', SCRIPT_INSTANCE, SCRIPT_NAME],
+                speed_test_metric_value)
+            yield speed_test_metric_constructor
+        LOGGER.info("collection done, taking a nap")
+
+if __name__ == '__main__':
+    LOGGER.info("starting app %s", SCRIPT_NAME)
+    REGISTRY.register(SpeedTestCollector())
+    start_http_server(PORT_NUMBER)
+    while True:
+        time.sleep(60)

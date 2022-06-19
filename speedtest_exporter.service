@@ -1,0 +1,11 @@
+[Unit]
+Description=Speedtest Exporter
+Wants=network.target network-online.target
+After=network.target network-online.target
+
+[Service]
+User=services
+Restart=always
+ExecStart=/path/to/speedtest_exporter --port 8042
+[Install]
+WantedBy=default.target
