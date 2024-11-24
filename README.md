@@ -23,6 +23,46 @@ pip3 install -r requirements.txt
 
 Change the path to this script in the file file to `speedtest_exporter.service`, change informations from command-line options and follow the steps to configure the script to run like a [systemd] service.
 
+### Known Error
+
+The [Speed Test library] used in this script uses by default HTTP connection to run some tests, to ensure HTTPS running everytime you have to pass "_secure=True_" parameter like this `speedtest.Speedtest(secure=True)`.
+
+This solution ensure execution without errors, but also it tends to increase the ping latency as it show below:
+
+![alt ping](imgs/security_enabled.png "Ping result before and after")
+
+For notice, if the "security" parameter is not passed to the library, it's possible to see a decrease in "_Ping latency_" data, but also some gaps in the graph and some error lines in the script log:
+
+```
+Nov 03 19:00:50 localhost speedtest_exporter[776]: Exception occurred during processing of request from ('127.0.0.1', 42870)
+Nov 03 19:00:50 localhost speedtest_exporter[776]: Traceback (most recent call last):
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/usr/lib/python3.9/socketserver.py", line 650, in process_request_thread
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     self.finish_request(request, client_address)
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/usr/lib/python3.9/socketserver.py", line 360, in finish_request
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     self.RequestHandlerClass(request, client_address, self)
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/usr/lib/python3.9/socketserver.py", line 720, in __init__
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     self.handle()
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/usr/lib/python3.9/http/server.py", line 427, in handle
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     self.handle_one_request()
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/usr/lib/python3.9/http/server.py", line 415, in handle_one_request
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     method()
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/home/service/.local/lib/python3.9/site-packages/prometheus_client/exposition.py", line 152, in do_GET
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     output = encoder(registry)
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/home/service/.local/lib/python3.9/site-packages/prometheus_client/openmetrics/exposition.py", line 14, in generate_latest
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     for metric in registry.collect():
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/home/service/.local/lib/python3.9/site-packages/prometheus_client/registry.py", line 75, in collect
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     for metric in collector.collect():
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/home/service/speedtest_exporter/speedtest_exporter", line 57, in collect
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     speed_test_executor = speedtest.Speedtest()
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/home/service/.local/lib/python3.9/site-packages/speedtest.py", line 1095, in __init__
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     self.get_config()
+Nov 03 19:00:50 localhost speedtest_exporter[776]:   File "/home/service/.local/lib/python3.9/site-packages/speedtest.py", line 1127, in get_config
+Nov 03 19:00:50 localhost speedtest_exporter[776]:     raise ConfigRetrievalError(e)
+Nov 03 19:00:50 localhost speedtest_exporter[776]: speedtest.ConfigRetrievalError: HTTP Error 403: Forbidden
+```
+
+Eighterway, take the "_Ping latency_" information more as a reference than an acurated ping information since this is a recomendation from the [library creator itself](https://github.com/sivel/speedtest-cli?tab=readme-ov-file#inconsistency)
+
 ## Command-line Options
 
 ```sh
@@ -78,6 +118,7 @@ See LICENSE file
 [python-badge]: https://img.shields.io/badge/python-3.7.3-blue
 [python-version]: https://www.python.org/downloads/release/python-373/
 [pylint-score]: https://mperlet.github.io/pybadge/badges/9.18.svg
+[Speed Test library]: https://github.com/sivel/speedtest-cli
 [Reinaldo Lima]: https://github.com/reimlima
 [systemd]: https://wiki.debian.org/systemd/Services
 [YAML]: https://en.wikipedia.org/wiki/YAML

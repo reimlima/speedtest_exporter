@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Speedtest Exporter - Exposes Metrics to Prometheus
-
 """
+
 import os
 import sys
 import time
@@ -17,6 +17,7 @@ from systemd.journal import JournaldLogHandler
 SCRIPT_NAME = os.path.basename(sys.argv[0])
 SCRIPT_INSTANCE = os.uname()[1]
 speed_test_metrics = {}
+speed_test_text_metrics = {}
 
 # Dealing with command line options
 PARSER = argparse.ArgumentParser()
@@ -53,7 +54,8 @@ class SpeedTestCollector(object):
         """
         Function that does almost everything, like prometheus_client examples
         """
-        speed_test_executor = speedtest.Speedtest()
+        LOGGER.info("starting new execution")
+        speed_test_executor = speedtest.Speedtest(secure=True)
         speed_test_executor.get_servers()
         speed_test_executor.get_best_server()
         speed_test_executor.download()
@@ -62,14 +64,35 @@ class SpeedTestCollector(object):
         speed_test_metrics['download'] = speed_test_result['download']
         speed_test_metrics['upload'] = speed_test_result['upload']
         speed_test_metrics['ping'] = speed_test_result['ping']
+        speed_test_metrics['server_lat'] = speed_test_result['server']['lat']
+        speed_test_metrics['server_lon'] = speed_test_result['server']['lon']
+        speed_test_metrics['client_lat'] = speed_test_result['client']['lat']
+        speed_test_metrics['client_lon'] = speed_test_result['client']['lon']
+        speed_test_text_metrics['sponsor'] = speed_test_result['server']['sponsor']
+        speed_test_text_metrics['city'] = speed_test_result['server']['name']
+        speed_test_text_metrics['isp'] = speed_test_result['client']['isp']
+        speed_test_text_metrics['isprating'] = speed_test_result['client']['isprating']
+        speed_test_text_metrics['ip'] = speed_test_result['client']['ip']
         for dict_key in speed_test_metrics:
             metric_name = 'speedtest_{}'.format(dict_key)
             help_text = 'speed test metric for {}'.format(dict_key)
             speed_test_metric_value = speed_test_metrics[dict_key]
+            LOGGER.info("%s : %s", metric_name, str(speed_test_metric_value))
             speed_test_metric_constructor = GaugeMetricFamily(
                 metric_name, help_text, labels=['type', 'instance', 'job'])
             speed_test_metric_constructor.add_metric(
                 ['speed_test_metrics', SCRIPT_INSTANCE, SCRIPT_NAME],
+                speed_test_metric_value)
+            yield speed_test_metric_constructor
+
+        for dict_key in speed_test_text_metrics:
+            metric_name = 'speedtest_{}'.format(dict_key)
+            help_text = 'speed test information for {}'.format(dict_key)
+            speed_test_metric_value = 1
+            speed_test_metric_constructor = GaugeMetricFamily(
+                metric_name, help_text, labels=['type', 'instance', 'job', 'text_value'])
+            speed_test_metric_constructor.add_metric(
+                ['speed_test_metrics', SCRIPT_INSTANCE, SCRIPT_NAME, speed_test_text_metrics[dict_key]],
                 speed_test_metric_value)
             yield speed_test_metric_constructor
         LOGGER.info("collection done, taking a nap")
